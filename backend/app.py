@@ -7,8 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, HttpUrl
 import yt_dlp
 
-
-app = FastAPI(title="BitChute MP4 Extractor")
+app = FastAPI(title="BitChute Video Extractor")
 
 app.add_middleware(
     CORSMiddleware,
@@ -16,7 +15,6 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
-
 
 class VideoRequest(BaseModel):
     url: HttpUrl
@@ -45,7 +43,9 @@ def validate_url(url):
 
 @app.get("/")
 def home():
-    return {"status": "BitChute Extractor Online"}
+    return {
+        "status": "BitChute Extractor Online"
+    }
 
 
 @app.get("/health")
@@ -76,20 +76,20 @@ def extract_video(data: VideoRequest):
     except Exception as e:
         raise HTTPException(
             502,
-            "Video extraction failed: " + str(e)[:300]
+            "Video extraction failed or source unavailable."
         )
 
     formats = []
-    seen_urls = set()
+    seen = set()
 
     for f in info.get("formats", []):
 
         video_url = f.get("url")
 
-        if not video_url or video_url in seen_urls:
+        if not video_url:
             continue
 
-        if f.get("vcodec") == "none":
+        if f.get("vcodec") in [None, "none"]:
             continue
 
         ext = f.get("ext", "")
@@ -97,11 +97,13 @@ def extract_video(data: VideoRequest):
         if ext not in ["mp4", "webm", "m3u8"]:
             continue
 
+        format_id = f.get("format_id")
         height = f.get("height")
+        width = f.get("width")
+        fps = f.get("fps")
 
         audio = f.get("acodec") not in [
-            None,
-            "none"
+            None, "none"
         ]
 
         quality = (
@@ -110,14 +112,29 @@ def extract_video(data: VideoRequest):
             else f.get("format_note") or "Unknown"
         )
 
+        unique_key = (
+            format_id,
+            height,
+            ext,
+            f.get("acodec"),
+            f.get("vcodec")
+        )
+
+        if unique_key in seen:
+            continue
+
+        seen.add(unique_key)
+
         formats.append({
             "quality": quality,
             "height": height,
-            "width": f.get("width"),
-            "fps": f.get("fps"),
+            "width": width,
+            "fps": fps,
             "format": ext,
-            "format_id": f.get("format_id"),
+            "format_id": format_id,
             "has_audio": audio,
+            "video_codec": f.get("vcodec"),
+            "audio_codec": f.get("acodec"),
             "filesize": (
                 f.get("filesize")
                 or f.get("filesize_approx")
@@ -125,14 +142,12 @@ def extract_video(data: VideoRequest):
             "url": video_url
         })
 
-        seen_urls.add(video_url)
-
     formats.sort(
-        key=lambda f: (
-            f["height"] or 0,
-            f["fps"] or 0,
-            f["format"] == "mp4",
-            f["has_audio"]
+        key=lambda x: (
+            x["height"] or 0,
+            x["fps"] or 0,
+            x["format"] == "mp4",
+            x["has_audio"]
         ),
         reverse=True
     )
@@ -142,18 +157,23 @@ def extract_video(data: VideoRequest):
         if f["format"] == "mp4"
     ]
 
-    available_qualities = list(
-        dict.fromkeys(
-            f["quality"] for f in mp4_formats
-        )
+    qualities = sorted(
+        set(
+            f["quality"]
+            for f in formats
+            if f["height"]
+        ),
+        key=lambda q: int(q.replace("p", "")),
+        reverse=True
     )
 
     return {
         "title": info.get("title"),
         "thumbnail": info.get("thumbnail"),
+        "duration": info.get("duration"),
         "formats": formats,
         "mp4_formats": mp4_formats,
-        "available_qualities": available_qualities,
+        "available_qualities": qualities,
         "total_formats": len(formats),
         "total_mp4_formats": len(mp4_formats)
     }
