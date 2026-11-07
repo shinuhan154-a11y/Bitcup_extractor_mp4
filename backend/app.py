@@ -77,8 +77,8 @@ def extract_video(data: VideoRequest):
         if not video_url or video_url in seen_urls:
             continue
 
-        if f.get("vcodec") in [None, "none"]:
-            continue
+        if f.get("vcodec") == "none":
+    continue
 
         ext = f.get("ext", "")
 
