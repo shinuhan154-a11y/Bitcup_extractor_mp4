@@ -16,6 +16,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 class VideoRequest(BaseModel):
     url: HttpUrl
 
@@ -33,7 +34,7 @@ def validate_url(url):
         raise HTTPException(400, "BitChute URLs only")
 
     if not re.search(
-        r"/(video|embed)/[A-Za-z0-9]+",
+        r"/(video|embed)/[A-Za-z0-9]+/?$",
         parsed.path
     ):
         raise HTTPException(400, "Invalid video URL")
@@ -64,6 +65,7 @@ def extract_video(data: VideoRequest):
         "skip_download": True,
         "noplaylist": True,
         "socket_timeout": 30,
+        "extract_flat": False,
     }
 
     try:
@@ -76,7 +78,13 @@ def extract_video(data: VideoRequest):
     except Exception as e:
         raise HTTPException(
             502,
-            "Video extraction failed or source unavailable."
+            detail=f"Extraction failed: {str(e)[:300]}"
+        )
+
+    if not info:
+        raise HTTPException(
+            502,
+            "No video information returned."
         )
 
     formats = []
@@ -89,7 +97,9 @@ def extract_video(data: VideoRequest):
         if not video_url:
             continue
 
-        if f.get("vcodec") in [None, "none"]:
+        # Reject audio-only formats.
+        # Missing codec metadata is not automatically rejected.
+        if f.get("vcodec") == "none":
             continue
 
         ext = f.get("ext", "")
@@ -102,7 +112,10 @@ def extract_video(data: VideoRequest):
         width = f.get("width")
         fps = f.get("fps")
 
-        audio = f.get("acodec") not in [
+        audio_codec = f.get("acodec")
+        video_codec = f.get("vcodec")
+
+        has_audio = audio_codec not in [
             None, "none"
         ]
 
@@ -114,10 +127,7 @@ def extract_video(data: VideoRequest):
 
         unique_key = (
             format_id,
-            height,
-            ext,
-            f.get("acodec"),
-            f.get("vcodec")
+            video_url,
         )
 
         if unique_key in seen:
@@ -132,9 +142,9 @@ def extract_video(data: VideoRequest):
             "fps": fps,
             "format": ext,
             "format_id": format_id,
-            "has_audio": audio,
-            "video_codec": f.get("vcodec"),
-            "audio_codec": f.get("acodec"),
+            "has_audio": has_audio,
+            "video_codec": video_codec,
+            "audio_codec": audio_codec,
             "filesize": (
                 f.get("filesize")
                 or f.get("filesize_approx")
@@ -142,6 +152,7 @@ def extract_video(data: VideoRequest):
             "url": video_url
         })
 
+    # Highest resolution first
     formats.sort(
         key=lambda x: (
             x["height"] or 0,
@@ -157,11 +168,11 @@ def extract_video(data: VideoRequest):
         if f["format"] == "mp4"
     ]
 
-    qualities = sorted(
+    available_qualities = sorted(
         set(
             f["quality"]
             for f in formats
-            if f["height"]
+            if f["height"] is not None
         ),
         key=lambda q: int(q.replace("p", "")),
         reverse=True
@@ -173,7 +184,7 @@ def extract_video(data: VideoRequest):
         "duration": info.get("duration"),
         "formats": formats,
         "mp4_formats": mp4_formats,
-        "available_qualities": qualities,
+        "available_qualities": available_qualities,
         "total_formats": len(formats),
         "total_mp4_formats": len(mp4_formats)
     }
