@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="A lightweight video link manager and MP4 player for videos you own or are authorized to stream.">
+<title>Free Stream Manager</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1020;--panel:#121a2d;--line:#26334e;--muted:#9ba9c2;--text:#f3f6ff;--accent:#7c9cff;--good:#67d7a2}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#172444 0,#0b1020 55%);color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+.wrap{max-width:1050px;margin:auto;padding:28px 18px 60px}.top{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:24px}.brand{display:flex;align-items:center;gap:12px}.logo{width:42px;height:42px;border-radius:13px;background:linear-gradient(135deg,#7c9cff,#9d78ff);display:grid;place-items:center;font-size:22px;color:#081020}.eyebrow{color:var(--muted);font-size:12px;letter-spacing:.12em;text-transform:uppercase}.brand h1{font-size:21px;margin:0}.tag{border:1px solid #315b4a;color:var(--good);border-radius:999px;padding:5px 10px;font-size:12px}
+.grid{display:grid;grid-template-columns:1fr 1.15fr;gap:18px}.panel{background:rgba(18,26,45,.94);border:1px solid var(--line);border-radius:18px;padding:20px;box-shadow:0 16px 45px #0003}.panel h2{font-size:17px;margin:0 0 4px}.sub{color:var(--muted);font-size:13px;margin:0 0 18px}
+label{display:block;font-size:13px;color:#c8d2e7;margin:13px 0 6px}input{width:100%;background:#0b1325;border:1px solid #30405f;color:var(--text);padding:12px 13px;border-radius:10px;outline:none}input:focus{border-color:var(--accent)}button{border:0;border-radius:10px;padding:11px 14px;font-weight:650;cursor:pointer;background:var(--accent);color:#071020}button.secondary{background:#25324c;color:var(--text);border:1px solid #354766}button.danger{background:#452536;color:#ffdbe4;border:1px solid #744057}button:disabled{opacity:.45;cursor:not-allowed}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:15px}.notice{font-size:12px;color:var(--muted);margin-top:14px}.status{min-height:20px;color:var(--good);font-size:13px;margin-top:10px}
+.player{background:#070b14;border:1px solid var(--line);border-radius:14px;overflow:hidden}video{width:100%;max-height:390px;display:block;background:#000;aspect-ratio:16/9}.playerInfo{padding:13px 15px}.playerInfo strong{display:block}.playerInfo span{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.libraryHead{display:flex;align-items:center;justify-content:space-between;margin:22px 0 12px}.libraryHead h2{font-size:17px;margin:0}.count{font-size:12px;color:var(--muted)}.list{display:grid;gap:10px}.item{display:flex;justify-content:space-between;align-items:center;gap:12px;background:#0d1527;border:1px solid var(--line);padding:12px;border-radius:12px}.itemInfo{min-width:0}.itemInfo b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.itemInfo small{display:block;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:520px}.itemActions{display:flex;gap:6px;flex-shrink:0}.itemActions button{padding:8px 10px;font-size:12px}.empty{padding:22px;text-align:center;border:1px dashed #34425f;border-radius:12px;color:var(--muted);font-size:13px}
+footer{margin-top:22px;color:var(--muted);font-size:12px;text-align:center}
+@media(max-width:760px){.grid{grid-template-columns:1fr}.top{align-items:flex-start}.item{align-items:flex-start;flex-direction:column}.itemActions{width:100%}.itemActions button{flex:1}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><div class="logo">▶</div><div><div class="eyebrow">Simple video toolkit</div><h1>Free Stream Manager</h1></div></div>
+    <span class="tag">Free starter</span>
+  </header>
+
+  <main>
+    <div class="grid">
+      <section class="panel">
+        <h2>Add a video</h2>
+        <p class="sub">Save a video link in this browser and create a shareable player link.</p>
+        <form id="videoForm">
+          <label for="title">Video title</label>
+          <input id="title" maxlength="100" placeholder="e.g. My sample video" required>
+          <label for="source">Direct MP4 or supported video URL</label>
+          <input id="source" type="url" placeholder="https://example.com/video.mp4" required>
+          <label for="poster">Thumbnail URL (optional)</label>
+          <input id="poster" type="url" placeholder="https://example.com/poster.jpg">
+          <div class="actions"><button type="submit">Add to my library</button><button type="button" class="secondary" id="clearForm">Clear</button></div>
+          <div class="status" id="status" role="status"></div>
+        </form>
+        <p class="notice">Only add videos you own or have permission to stream. This starter does not extract protected streams or bypass access controls.</p>
+      </section>
+
+      <section class="panel">
+        <h2>Player preview</h2>
+        <p class="sub">Test a video source before sharing it.</p>
+        <div class="player">
+          <video id="player" controls playsinline preload="metadata" poster=""></video>
+          <div class="playerInfo"><strong id="nowTitle">No video selected</strong><span id="nowSource">Add a video or open a share link.</span></div>
+        </div>
+        <div class="actions"><button class="secondary" id="copyCurrent" disabled>Copy player link</button><button class="secondary" id="openPlayer" disabled>Open player view</button></div>
+        <p class="notice">Playback depends on the source host allowing direct playback, range requests and hotlinking. Some platforms only permit playback through their official embed.</p>
+      </section>
+    </div>
+
+    <section>
+      <div class="libraryHead"><h2>My browser library</h2><span class="count" id="count">0 videos</span></div>
+      <div class="list" id="library"><div class="empty">No videos added yet. Add an authorized MP4 link above.</div></div>
+    </section>
+  </main>
+  <footer>Free Stream Manager · Browser-only starter · No server-side video storage</footer>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+const KEY = "fsm_v1_videos";
+let videos = [];
+let current = null;
+
+function load(){try{videos=JSON.parse(localStorage.getItem(KEY)||"[]");if(!Array.isArray(videos))videos=[];}catch{videos=[];}}
+function save(){localStorage.setItem(KEY,JSON.stringify(videos));}
+function safeUrl(value){try{const u=new URL(value);return ["http:","https:"].includes(u.protocol)?u.href:null;}catch{return null;}}
+function shareUrl(v){
+  const u=new URL(location.href);u.search="";u.hash=new URLSearchParams({title:v.title,src:v.src,poster:v.poster||""}).toString();return u.href;
+}
+function setCurrent(v){
+  current=v;$("player").pause();$("player").src=v.src;$("player").poster=v.poster||"";$("player").load();
+  $("nowTitle").textContent=v.title;$("nowSource").textContent=v.src;
+  $("copyCurrent").disabled=false;$("openPlayer").disabled=false;
+}
+function render(){
+  $("count").textContent=videos.length+" video"+(videos.length===1?"":"s");
+  const root=$("library");root.innerHTML="";
+  if(!videos.length){root.innerHTML='<div class="empty">No videos added yet. Add an authorized MP4 link above.</div>';return;}
+  videos.forEach(v=>{
+    const row=document.createElement("div");row.className="item";
+    const info=document.createElement("div");info.className="itemInfo";
+    const b=document.createElement("b");b.textContent=v.title;
+    const s=document.createElement("small");s.textContent=v.src;
+    info.append(b,s);
+    const acts=document.createElement("div");acts.className="itemActions";
+    const play=document.createElement("button");play.textContent="Preview";play.onclick=()=>setCurrent(v);
+    const copy=document.createElement("button");copy.className="secondary";copy.textContent="Copy link";copy.onclick=()=>copyText(shareUrl(v));
+    const del=document.createElement("button");del.className="danger";del.textContent="Delete";del.onclick=()=>{videos=videos.filter(x=>x.id!==v.id);save();render();};
+    acts.append(play,copy,del);row.append(info,acts);root.append(row);
+  });
+}
+async function copyText(t){
+  try{await navigator.clipboard.writeText(t);$("status").textContent="Link copied.";}
+  catch{$("status").textContent="Copy blocked by browser. Copy this URL manually: "+t;}
+}
+$("videoForm").addEventListener("submit",e=>{
+  e.preventDefault();const title=$("title").value.trim(),src=safeUrl($("source").value.trim()),poster=$("poster").value.trim()?safeUrl($("poster").value.trim()):"";
+  if(!title||!src||($("poster").value.trim()&&!poster)){$("status").textContent="Enter a title and valid http/https video URL (and valid thumbnail URL if used).";return;}
+  const v={id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),title,src,poster};
+  videos.unshift(v);save();render();setCurrent(v);$("status").textContent="Added to this browser. Use Copy link to share the player.";e.target.reset();
+});
+$("clearForm").onclick=()=>{$("videoForm").reset();$("status").textContent="";};
+$("copyCurrent").onclick=()=>{if(current)copyText(shareUrl(current));};
+$("openPlayer").onclick=()=>{if(current)window.open(shareUrl(current),"_blank","noopener");};
+
+function openShared(){
+  const p=new URLSearchParams(location.hash.slice(1));
+  const src=safeUrl(p.get("src")||"");
+  if(!src)return;
+  const v={title:(p.get("title")||"Shared video").slice(0,100),src,poster:safeUrl(p.get("poster")||"")||""};
+  setCurrent(v);
+  document.querySelector(".grid").scrollIntoView({behavior:"smooth",block:"start"});
+}
+load();render();openShared();
+</script>
+</body>
+</html>
